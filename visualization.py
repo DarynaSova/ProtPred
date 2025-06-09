@@ -52,3 +52,24 @@ df['normalized_values_str'] = df['normalized_values'].apply(lambda arr: ','.join
 df.to_csv('normalized_output.csv', index=False)
 
 print("Normalization complete. Output saved to 'normalized_output.csv'.")
+
+# --- Add after your normalization code, before or after plotting ---
+
+df = df[df['sources'].apply(lambda x: isinstance(x, str))]
+
+
+# Compute mean normalized value for each entry
+df['mean_normalized'] = df['normalized_values'].apply(lambda arr: np.mean(arr) if len(arr) > 0 else np.nan)
+
+# Pivot the table so each source type is a column
+pivot_df = df.pivot_table(
+    index=['pdb_id', 'uniprot_id'],
+    columns='sources',
+    values='mean_normalized'
+).reset_index()
+
+# Compute pairwise correlations between continuous measures
+corr = pivot_df.drop(['pdb_id', 'uniprot_id'], axis=1).corr()
+
+print("Pairwise correlations between continuous measures:")
+print(corr)
