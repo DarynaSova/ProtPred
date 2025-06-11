@@ -2,6 +2,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+# This is to remove the instances where in the bfactor metric there are instances with 
+# the same uniprot id and residue start-end but different pdb ids and values. 
+# Likely caused by different experimentation on the same region.
+# Values kept based on the higher bfactors, as in higher disorder 
+
 # Load the CSV file
 df = pd.read_csv(r"final_final_filtered_dataset.csv") 
 
