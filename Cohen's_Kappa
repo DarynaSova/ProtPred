@@ -1,0 +1,57 @@
+import pandas as pd
+from sklearn.metrics import cohen_kappa_score
+from itertools import combinations
+#this is to evaluate concordance with Cohen's Kappa
+
+# non normalized values
+df_raw = pd.read_csv('final_final_nodups.csv')
+
+# Group by 'sources' and calculate mean and std
+stats = df_raw.groupby('sources')['values'].agg(['mean', 'std']).to_dict()
+
+# Extract means and stds as dictionaries
+raw_means = stats['mean']
+raw_stds = stats['std']
+
+print("Raw Means:")
+print(raw_means)
+print("\nRaw Standard Deviations:")
+print(raw_stds)
+
+# normalized file
+df = pd.read_csv(r'residue_level_wide_format_nodups.csv')
+
+# Metrics that are already z-score normalized
+metrics = ['bfactors', 'rmsf', 'plddt', 'gscore']
+
+# original (non-normalized) thresholds
+raw_thresholds = {
+    'bfactors': 2,   
+    'rmsf': 2,       
+    'plddt': 80,     
+    'gscore': 0.65     
+}
+
+# Convert to z-score thresholds
+z_thresholds = {
+    m: (raw_thresholds[m] - raw_means[m]) / raw_stds[m]
+    for m in raw_thresholds
+}
+
+invert = {'plddt'}  # set of inverted metrics
+
+for metric in raw_thresholds:
+    z_thresh = z_thresholds[metric]
+    if metric in invert:
+        df[f'{metric}_binary'] = (df[metric] < z_thresh).astype(int)
+    else:
+        df[f'{metric}_binary'] = (df[metric] > z_thresh).astype(int)
+
+
+# Compute Pairwise Cohen's Kappa 
+binary_cols = [f'{metric}_binary' for metric in metrics]
+
+print("\nPairwise Cohen's Kappa Scores:")
+for m1, m2 in combinations(binary_cols, 2):
+    kappa = cohen_kappa_score(df[m1], df[m2])
+    print(f"  {m1} vs {m2}: {kappa:.3f}")
