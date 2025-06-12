@@ -1,22 +1,45 @@
 import pandas as pd
 from sklearn.metrics import cohen_kappa_score
 from itertools import combinations
+import re
+from sklearn.metrics import cohen_kappa_score
+from itertools import combinations
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 #this is to evaluate concordance with Cohen's Kappa
 
 # non normalized values
 df_raw = pd.read_csv('final_final_nodups.csv')
 
-# Group by 'sources' and calculate mean and std
-stats = df_raw.groupby('sources')['values'].agg(['mean', 'std']).to_dict()
+# 1. Normalize source names to lowercase
+df_raw['sources'] = df_raw['sources'].str.lower()
 
-# Extract means and stds as dictionaries
-raw_means = stats['mean']
-raw_stds = stats['std']
+# 2. Keep only the metrics you care about
+target_metrics = ['bfactors', 'rmsf', 'plddt', 'gscore']
+df_raw = df_raw[df_raw['sources'].isin(target_metrics)].copy()
 
-print("Raw Means:")
-print(raw_means)
-print("\nRaw Standard Deviations:")
-print(raw_stds)
+# Remove everything that's not part of a number, like units or brackets
+df_raw['values'] = (
+    df_raw['values']
+    .astype(str)
+    .str.lower()
+    .str.strip()
+    .str.extract(r'([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)')  # regex to extract numeric part
+    [0]
+)
+df_raw['values'] = pd.to_numeric(df_raw['values'], errors='coerce')
+
+# 4. Group and calculate mean/std per metric
+stats = df_raw.groupby('sources')['values'].agg(['mean', 'std'])
+
+# 5. Convert to dictionaries
+raw_means = stats['mean'].to_dict()
+raw_stds = stats['std'].to_dict()
+
+print("Raw Means:\n", raw_means)
+print("\nRaw Standard Deviations:\n", raw_stds)
+
 
 # normalized file
 df = pd.read_csv(r'residue_level_wide_format_nodups.csv')
@@ -37,6 +60,8 @@ z_thresholds = {
     m: (raw_thresholds[m] - raw_means[m]) / raw_stds[m]
     for m in raw_thresholds
 }
+print("\nNormal Thresholds:", raw_thresholds)
+print("\nZ Thresholds:", z_thresholds)
 
 invert = {'plddt'}  # set of inverted metrics
 
@@ -51,7 +76,23 @@ for metric in raw_thresholds:
 # Compute Pairwise Cohen's Kappa 
 binary_cols = [f'{metric}_binary' for metric in metrics]
 
+kappa_matrix = pd.DataFrame(index=binary_cols, columns=binary_cols, dtype=float)
+
 print("\nPairwise Cohen's Kappa Scores:")
-for m1, m2 in combinations(binary_cols, 2):
-    kappa = cohen_kappa_score(df[m1], df[m2])
-    print(f"  {m1} vs {m2}: {kappa:.3f}")
+for m1 in binary_cols:
+    for m2 in binary_cols:
+        if m1 == m2:
+            kappa_matrix.loc[m1, m2] = 1.0  # Self-comparison
+        else:
+            kappa = cohen_kappa_score(df[m1], df[m2])
+            kappa_matrix.loc[m1, m2] = kappa
+            # To avoid duplicate prints (since it's a symmetric matrix)
+            if binary_cols.index(m1) < binary_cols.index(m2):
+                print(f"  {m1} vs {m2}: {kappa:.3f}")
+
+# Plot the heatmap
+plt.figure(figsize=(8, 6))
+sns.heatmap(kappa_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1, square=True, cbar_kws={"label": "Cohen's Kappa"})
+plt.title("Pairwise Cohen's Kappa Scores")
+plt.tight_layout()
+plt.show()
