@@ -2,8 +2,6 @@ import pandas as pd
 from sklearn.metrics import cohen_kappa_score
 from itertools import combinations
 import re
-from sklearn.metrics import cohen_kappa_score
-from itertools import combinations
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
