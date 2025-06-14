@@ -7,6 +7,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 #this is to evaluate concordance with Cohen's Kappa
 
+#first find std and mean to normalize the thresholds
 # non normalized values
 df_raw = pd.read_csv('final_final_nodups.csv')
 
