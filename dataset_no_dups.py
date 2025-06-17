@@ -5,15 +5,29 @@ from itertools import product
 from itertools import combinations
 import os
 import re
+import ast
 
-# This is to remove the instances where there duplicates in the Database 
+# This is to check the instances where there duplicates in the Database 
 
 df = pd.read_csv(r"final_final_filtered_dataset.csv") 
+
+#check region length vs values quantity
+df['parsed_values'] = df['values'].apply(lambda x: ast.literal_eval(x))
+df['expected_len'] = df['SP_END'] - df['SP_BEG'] + 1
+df['actual_len'] = df['parsed_values'].apply(len)
+df['length_match'] = df['expected_len'] == df['actual_len']
+mismatch_count = (~df['length_match']).sum()
+print(f"{mismatch_count} rows have mismatched region and values lengths.")
+df_mismatched = df[df['length_match'] == False]
+df_mismatched.to_csv("mismatched_region_lengths.csv", index=False)
+
+
 '''
 # Count the frequency of each metric in the 'sources' column
 metric_counts = df['sources'].value_counts()
 print("Category counts:")
 print(metric_counts)
+'''
 '''
 duplicate_values = df[df.duplicated(subset=['values'], keep=False)]
 print(f"Found {len(duplicate_values)} rows with duplicated 'values'.")
@@ -61,7 +75,7 @@ for r in range(len(raw_cols), 0, -1):
 # Display results
 summary_df = pd.DataFrame(results)
 print(summary_df)
-
+'''
 
 
 '''
