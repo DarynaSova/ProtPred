@@ -1,4 +1,9 @@
 import pandas as pd
+import numpy as np
+import ast
+import csv
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # Load the uploaded CSV file
 file_path = "dataset/final_final_nodups.csv"
@@ -23,7 +28,7 @@ records = []
 # Iterate through each row to expand it into residue-level data
 for _, row in df_filtered.iterrows():
     uniprot_id = row["uniprot_id"]
-    source = row["sources"]
+    source = row["sources"].lower()
     start = row["SP_BEG"]
     values = row["values"]
 
@@ -49,3 +54,13 @@ final_df = expanded_df.groupby(
 ).first()
 
 final_df.to_csv("dataset/residue_level_wide_format_new.csv")
+
+df_wide = final_df
+corr_matrix = df_wide[["plddt", "bfactors", "rmsf", "gscore"]].corr(method='spearman')
+
+
+plt.figure(figsize=(8, 6))
+sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f", vmin=-1, vmax=1)
+plt.title("Correlation Matrix Between Different Metrics spearman ")
+plt.tight_layout()
+plt.savefig("plots/correlation_matrix_spearman.png", dpi=300, bbox_inches='tight')
