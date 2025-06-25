@@ -1,97 +1,106 @@
 import pandas as pd
 from sklearn.metrics import cohen_kappa_score
-from itertools import combinations
-import re
-import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-#this is to evaluate concordance with Cohen's Kappa
 
-#first find std and mean to normalize the thresholds
-# non normalized values
-df_raw = pd.read_csv('final_final_nodups.csv')
-
-# 1. Normalize source names to lowercase
-df_raw['sources'] = df_raw['sources'].str.lower()
-
-# 2. Keep only the metrics you care about
-target_metrics = ['bfactors', 'rmsf', 'plddt', 'gscore']
-df_raw = df_raw[df_raw['sources'].isin(target_metrics)].copy()
-
-# Remove everything that's not part of a number, like units or brackets
-df_raw['values'] = (
-    df_raw['values']
-    .astype(str)
-    .str.lower()
-    .str.strip()
-    .str.extract(r'([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)')  # regex to extract numeric part
-    [0]
-)
-df_raw['values'] = pd.to_numeric(df_raw['values'], errors='coerce')
-
-# 4. Group and calculate mean/std per metric
-stats = df_raw.groupby('sources')['values'].agg(['mean', 'std'])
-
-# 5. Convert to dictionaries
-raw_means = stats['mean'].to_dict()
-raw_stds = stats['std'].to_dict()
-
-print("Raw Means:\n", raw_means)
-print("\nRaw Standard Deviations:\n", raw_stds)
+import numpy as np
+def compute_cohen_kappa_manual(x, y):
+    tp = np.sum((x == 1) & (y == 1))
+    tn = np.sum((x == 0) & (y == 0))
+    fp = np.sum((x == 0) & (y == 1))
+    fn = np.sum((x == 1) & (y == 0))
+    total = tp + tn + fp + fn
+    if total == 0:
+        return 0
+    po = (tp + tn) / total
+    px_yes = (tp + fn) / total
+    py_yes = (tp + fp) / total
+    px_no = (tn + fp) / total
+    py_no = (tn + fn) / total
+    pe = px_yes * py_yes + px_no * py_no
+    return (po - pe) / (1 - pe) if (1 - pe) != 0 else 0
 
 
-# normalized file
-df = pd.read_csv(r'residue_level_wide_format_nodups.csv')
+# Load the dataset containing both raw and z-score values
+df = pd.read_csv(r'residue_level_wide_format_zscore_norm.csv')
 
-# Metrics that are already z-score normalized
-metrics = ['bfactors', 'rmsf', 'plddt', 'gscore']
-
-# original (non-normalized) thresholds
+# Define raw thresholds for metrics (except 'bfactors', already z-score)
 raw_thresholds = {
-    'bfactors': 2,   
-    'rmsf': 2,       
-    'plddt': 80,     
-    'gscore': 0.65     
+    'rmsf': 2,
+    'plddt': 80,
+    'gscore': 0.65
 }
 
-# Convert to z-score thresholds
-z_thresholds = {
-    m: (raw_thresholds[m] - raw_means[m]) / raw_stds[m]
-    for m in raw_thresholds
-}
-print("\nNormal Thresholds:", raw_thresholds)
-print("\nZ Thresholds:", z_thresholds)
+# Add fixed z-score threshold for 'bfactors'
+z_thresholds = {'bfactors': 2}
 
-invert = {'plddt'}  # set of inverted metrics
-
-for metric in raw_thresholds:
-    z_thresh = z_thresholds[metric]
-    if metric in invert:
-        df[f'{metric}_binary'] = (df[metric] < z_thresh).astype(int)
+# Calculate mean and std for converting raw thresholds
+for metric, raw_thresh in raw_thresholds.items():
+    if metric in df.columns:
+        mean = df[metric].mean()
+        std = df[metric].std()
+        z_thresh = (raw_thresh - mean) / std
+        z_thresholds[metric] = z_thresh
     else:
-        df[f'{metric}_binary'] = (df[metric] > z_thresh).astype(int)
+        print(f"Warning: Raw metric '{metric}' not found in DataFrame.")
 
+print("\nRaw means and stds:")
+for metric in raw_thresholds:
+    print(f"{metric}: mean = {df[metric].mean():.3f}, std = {df[metric].std():.3f}")
 
-# Compute Pairwise Cohen's Kappa 
-binary_cols = [f'{metric}_binary' for metric in metrics]
+# Print thresholds for verification
+print("Z-score thresholds used for binary classification:")
+for k, v in z_thresholds.items():
+    print(f"  {k}: {v:.3f}")
 
+# Define which metrics to invert (low values = disorder)
+invert = {'plddt'}
+
+# Apply thresholds to create binary disorder calls
+for metric, z_thresh in z_thresholds.items():
+    zscore_col = metric + '_zscore'
+    binary_col = metric + '_binary'
+
+    if zscore_col not in df.columns:
+        print(f"Warning: Z-score column '{zscore_col}' not found.")
+        continue
+
+    if metric in invert:
+        df[binary_col] = (df[zscore_col] < z_thresh).astype(int)
+    else:
+        df[binary_col] = (df[zscore_col] > z_thresh).astype(int)
+
+# Gather all binary columns
+binary_cols = [f'{metric}_binary' for metric in z_thresholds.keys() if f'{metric}_binary' in df.columns]
+
+# Initialize empty kappa matrix
 kappa_matrix = pd.DataFrame(index=binary_cols, columns=binary_cols, dtype=float)
 
+# Compute pairwise Cohen's kappa
 print("\nPairwise Cohen's Kappa Scores:")
+
 for m1 in binary_cols:
     for m2 in binary_cols:
         if m1 == m2:
-            kappa_matrix.loc[m1, m2] = 1.0  # Self-comparison
+            kappa_matrix.loc[m1, m2] = 1.0
         else:
-            kappa = cohen_kappa_score(df[m1], df[m2])
+            kappa = compute_cohen_kappa_manual(df[m1], df[m2])
             kappa_matrix.loc[m1, m2] = kappa
-            # To avoid duplicate prints (since it's a symmetric matrix)
             if binary_cols.index(m1) < binary_cols.index(m2):
                 print(f"  {m1} vs {m2}: {kappa:.3f}")
 
-# Plot the heatmap
+
+print("\nBinary value counts per metric:")
+for col in binary_cols:
+    print(f"{col}: {df[col].value_counts().to_dict()}")
+
+
+# Plot heatmap
 plt.figure(figsize=(8, 6))
 sns.heatmap(kappa_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1, square=True, cbar_kws={"label": "Cohen's Kappa"})
-plt.title("Pairwise Cohen's Kappa Scores")
+plt.title("Pairwise Cohen's Kappa Scores Between Disorder Metrics")
 plt.tight_layout()
 plt.show()
+
+
+
