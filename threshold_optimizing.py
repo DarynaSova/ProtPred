@@ -3,16 +3,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import cohen_kappa_score
+import seaborn as sns
+
 
 # --- Load dataset ---
-df = pd.read_csv(r"residue_level_wide_format_new_nodups_zscore.csv")
+df = pd.read_csv(r"residue_level_wide_format_zscore_norm.csv")
 
 # --- Manual Cohen's Kappa Function ---
 def compute_cohen_kappa_manual(x, y):
     tp = np.sum((x == 1) & (y == 1))
     tn = np.sum((x == 0) & (y == 0))
-    fp = np.sum((x == 0) & (y == 1))
-    fn = np.sum((x == 1) & (y == 0))
+    fp = np.sum((x == 1) & (y == 0))  
+    fn = np.sum((x == 0) & (y == 1))  
     total = tp + tn + fp + fn
     if total == 0:
         return 0
@@ -77,7 +80,7 @@ def optimize_threshold_against_disprot(series, disprot, direction='greater', ste
 predictors = {
     'bfactors_zscore': 'greater',
     'plddt_zscore': 'less',
-    'RMSF_zscore': 'greater',
+    'rmsf_zscore': 'greater',
     'gscore_zscore': 'greater'
 }
 
@@ -124,8 +127,52 @@ for col, direction in predictors.items():
 # --- Save results ---
 results_df = pd.DataFrame(results)
 results_df.to_csv("optimized_thresholds_vs_disprot.csv", index=False)
+#print(results_df[['metric', 'best_threshold']])
 
 # --- Output summary ---
 print(results_df)
 print("Saved results to 'optimized_thresholds_vs_disprot.csv'")
 print("Plots saved in 'plots/' directory.")
+
+
+'''
+#Best thresholds Cohen's Kappa corellation
+# Binarize predictors with best thresholds
+binary_calls = pd.DataFrame(index=df.index)
+
+for _, row in results_df.iterrows():
+    metric = row['metric']
+    threshold = row['best_threshold']
+    direction = row['direction']
+
+    print(metric, threshold)
+
+    if metric in df.columns:
+        if direction == 'greater':
+            binary_calls[metric] = (df[metric] > threshold).astype(int)
+        else:
+            binary_calls[metric] = (df[metric] < threshold).astype(int)
+
+# Calculate pairwise Cohen's kappa
+metrics = list(binary_calls.columns)
+n = len(metrics)
+kappa_matrix = np.zeros((n, n))
+
+for i in range(n):
+    for j in range(n):
+        valid = binary_calls[[metrics[i], metrics[j]]].notna().all(axis=1)
+        y1 = binary_calls.loc[valid, metrics[i]]
+        y2 = binary_calls.loc[valid, metrics[j]]
+        if len(y1) > 0:
+            kappa_matrix[i, j] = cohen_kappa_score(y1, y2)
+        else:
+            kappa_matrix[i, j] = np.nan
+
+# Plot heatmap
+plt.figure(figsize=(8, 6))
+sns.heatmap(kappa_matrix, xticklabels=metrics, yticklabels=metrics,
+            annot=True, fmt=".2f", cmap="coolwarm", center=0)
+plt.title("Pairwise Cohen's Kappa Between Binary Disorder Predictions")
+plt.tight_layout()
+plt.show()
+'''
