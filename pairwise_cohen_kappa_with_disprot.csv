@@ -1,0 +1,11 @@
+,Cohen Kappa (NaN-aware)
+"('bfactors_zscore_bin', 'plddt_zscore_bin')",0.0028691840436297716
+"('bfactors_zscore_bin', 'RMSF_zscore_bin')",-0.0008796285483027884
+"('bfactors_zscore_bin', 'gscore_zscore_bin')",0.0037082521492341823
+"('bfactors_zscore_bin', 'disprot_disorder')",0.0
+"('plddt_zscore_bin', 'RMSF_zscore_bin')",0.012056622384434642
+"('plddt_zscore_bin', 'gscore_zscore_bin')",0.19903569264270216
+"('plddt_zscore_bin', 'disprot_disorder')",0.0
+"('RMSF_zscore_bin', 'gscore_zscore_bin')",0.00632922180503135
+"('RMSF_zscore_bin', 'disprot_disorder')",0.0
+"('gscore_zscore_bin', 'disprot_disorder')",0.0

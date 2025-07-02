@@ -1,0 +1,5 @@
+metric,direction,best_threshold,kappa
+bfactors_zscore,greater,-1.0117111586193088,0.0
+plddt_zscore,less,-8.668922496545468,0.0
+RMSF_zscore,greater,-0.7375137381173426,0.0
+gscore_zscore,greater,-0.7387198337368142,0.0

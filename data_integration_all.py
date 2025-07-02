@@ -12,17 +12,14 @@ def compile_softdis(output_path):
 
     bfactor_dataset = load_from_disk("rawdata/SoftDis/clusters_arrow")
     softdis = bfactor_dataset.to_pandas()
-    softdis_clean = softdis[["id", "bfactors"]]
+    softdis_clean = softdis[["id", "bfactors", "sequence"]]
     softdis_clean = softdis_clean.copy()
     softdis_clean['pdb_id'] = softdis_clean['id'].str.lower()
     softdis_clean['bfactors'] = softdis_clean['bfactors'].apply(lambda x: x.tolist() if isinstance(x, np.ndarray) else x)
 
-    print(softdis_clean['bfactors'].head(10))
-    print(softdis_clean['bfactors'].apply(type).value_counts())
-
 
     softdis_merged = pd.merge(softdis_clean, pdb_uniprot_df, on='pdb_id', how='left')
-    softdis_rows = softdis_merged[['pdb_id', 'SP_PRIMARY', 'SP_BEG', 'SP_END']]
+    softdis_rows = softdis_merged[['pdb_id', 'sequence', 'SP_PRIMARY', 'SP_BEG', 'SP_END']]
     softdis_rows = softdis_rows.copy()
     softdis_rows.rename(columns={'SP_PRIMARY': 'uniprot_id'}, inplace=True)
     softdis_rows['values'] = softdis_merged['bfactors']
@@ -37,8 +34,8 @@ def compile_softdis(output_path):
     combined_df.to_csv(output_path, index=False)
 
 
-#output_combined_path = "dataset/bfactors.csv"
-#compile_softdis(output_combined_path)
+output_combined_path = "data/pdb_bfactors_sequence.csv"
+compile_softdis(output_combined_path)
 
 
 
@@ -101,7 +98,7 @@ def compile_ATLAS_plddt(output_path):
 
 
     # Merge both datasets on pdb_id
-    merged_df = pd.merge(atlas_df, pdb_uniprot_df, on='pdb_id', how='left')
+    merged_df = pd.merge(atlas_df, pdb_uniprot_df, on='pdb_id', how='inner')
 
     # Select and rename the required columns
     result_df = merged_df[['pdb_id', 'SP_PRIMARY', 'SP_BEG', 'SP_END', 'plddt_values']]
@@ -117,8 +114,8 @@ def compile_ATLAS_plddt(output_path):
     combined_df = combined_df.sort_values(by='pdb_id').reset_index(drop=True)
     combined_df.to_csv(output_path, index=False)
 
-output_path = "dataset/plddt.csv"
-compile_ATLAS_plddt(output_path)
+#output_path = "dataset/plddt.csv"
+#compile_ATLAS_plddt(output_path)
 
 import pandas as pd
 
@@ -149,15 +146,14 @@ def combine_and_sort_csv(rmsf_path, plddt_path, bfactors_path, output_path):
     combined_df_sorted['values'] = combined_df_sorted['values'].astype(str).str.replace('\n', ' ', regex=True)
     combined_df_sorted.to_csv(output_path, index=False)
 
-
-#if __name__ == "__main__":
+'''
 combine_and_sort_csv(
         rmsf_path="dataset/rmsf.csv",
         plddt_path="dataset/plddt.csv",
         bfactors_path="dataset/bfactors.csv",
        output_path="dataset/combined_rmsf_plddt_bfactors.csv"
     )
-
+'''
 
 def compile_Disprot_gscore(input_combined, output_path):
     mapped_df = pd.read_csv(input_combined)
@@ -196,6 +192,8 @@ def compile_Disprot_gscore(input_combined, output_path):
     combined_df = pd.concat([mapped_df, disprot_rows], ignore_index=True)
     combined_df = combined_df.sort_values(by='uniprot_id').reset_index(drop=True)
     mapped_df = combined_df
+    disprot_rows.to_csv("dataset/disprot.csv", index=False)
+
     gscore_df = pd.read_csv("data/merged_trizod_bmrb_output.csv")
     # Load the PDB-UniProt mapping file
     column_names = ['PDB', 'CHAIN', 'SP_PRIMARY', 'RES_BEG', 'RES_END', 'PDB_BEG', 'PDB_END', 'SP_BEG', 'SP_END']
@@ -222,6 +220,7 @@ def compile_Disprot_gscore(input_combined, output_path):
 
     gscore_rows = gscore_rows[mapped_df.columns]
 
+    gscore_rows.to_csv("dataset/gscore.csv", index=False)
     # Append and save
     combined_df = pd.concat([mapped_df, gscore_rows], ignore_index=True)
     combined_df = combined_df.sort_values(by='uniprot_id').reset_index(drop=True)
@@ -229,5 +228,5 @@ def compile_Disprot_gscore(input_combined, output_path):
 
     combined_df.to_csv(output_path, index=False)
 
-compile_Disprot_gscore("dataset/combined_rmsf_plddt_bfactors.csv", "dataset/final_final_dataset.csv")
+#compile_Disprot_gscore("dataset/combined_rmsf_plddt_bfactors.csv", "dataset/final_final_dataset.csv")
 
